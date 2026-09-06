@@ -1,0 +1,75 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "2easy DX482 Video Doorbell",
+        "description": "Connect directly to the doorbell on your LAN. No cloud account is used.",
+        "data": {
+          "host": "IP address",
+          "control_port": "Control port (binary protocol)",
+          "rtsp_port": "RTSP port",
+          "rtsp_username": "RTSP username",
+          "rtsp_password": "RTSP password",
+          "rtsp_channel": "RTSP channel (101 = main, 102 = sub)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the doorbell on the control port. Check the IP address and that the device is online."
+    },
+    "abort": {
+      "already_configured": "This doorbell is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "DX482 options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)",
+          "rtsp_channel": "RTSP channel (101 = main, 102 = sub)",
+          "ring_enabled": "Built-in ring detection (poll call log)",
+          "ring_poll_ms": "Ring poll interval (ms)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "open_door": {
+        "name": "Open door"
+      }
+    },
+    "lock": {
+      "door_lock": {
+        "name": "Door"
+      }
+    },
+    "camera": {
+      "camera": {
+        "name": "Camera"
+      }
+    },
+    "sensor": {
+      "door_state": {
+        "name": "Door state"
+      },
+      "rssi": {
+        "name": "Wi-Fi signal"
+      }
+    },
+    "binary_sensor": {
+      "door_open": {
+        "name": "Door"
+      },
+      "ring": {
+        "name": "Ringing"
+      }
+    },
+    "event": {
+      "doorbell": {
+        "name": "Doorbell"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "2easy DX482 Video Doorbell",
+  "content_in_root": false,
+  "render_readme": true,
+  "homeassistant": "2024.12.0"
+}
