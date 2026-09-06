@@ -3,7 +3,7 @@
   "name": "2easy DX482 Video Doorbell",
   "codeowners": [],
   "config_flow": true,
-  "dependencies": ["webhook"],
+  "dependencies": ["ffmpeg", "webhook"],
   "documentation": "https://github.com/bostrot/hacs-dx482-doorbell",
   "integration_type": "device",
   "iot_class": "local_polling",
