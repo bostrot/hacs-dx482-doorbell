@@ -4,10 +4,10 @@
   "codeowners": [],
   "config_flow": true,
   "dependencies": ["webhook"],
-  "documentation": "https://github.com/yourname/hacs-dx482-doorbell",
+  "documentation": "https://github.com/bostrot/hacs-dx482-doorbell",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/yourname/hacs-dx482-doorbell/issues",
+  "issue_tracker": "https://github.com/bostrot/hacs-dx482-doorbell/issues",
   "requirements": [],
   "version": "0.1.0"
 }
