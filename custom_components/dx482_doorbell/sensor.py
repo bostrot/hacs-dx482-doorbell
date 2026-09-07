@@ -1,63 +1,62 @@
-"""Sensor platform: door state and Wi-Fi signal."""
+"""Sensors: session state and last ring time."""
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorEntityDescription,
-    SensorStateClass,
-)
-from homeassistant.const import SIGNAL_STRENGTH_DECIBELS_MILLIWATT, EntityCategory
+from datetime import datetime, timezone
+
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import DX482ConfigEntry
-from .const import DATA_DOOR_STATE, DATA_RSSI
 from .entity import DX482Entity
 
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: DX482ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    coordinator = entry.runtime_data.coordinator
-    async_add_entities(
-        [
-            DX482DoorStateSensor(coordinator),
-            DX482RssiSensor(coordinator),
-        ]
-    )
+async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    async_add_entities([DX482StateSensor(entry), DX482LastRingSensor(entry)])
 
 
-class DX482DoorStateSensor(DX482Entity, SensorEntity):
-    _attr_translation_key = "door_state"
-    _attr_icon = "mdi:door"
+class DX482StateSensor(DX482Entity, SensorEntity):
+    _attr_translation_key = "session_state"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:doorbell-video"
 
-    def __init__(self, coordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{self._entry_id}_door_state"
+    def __init__(self, entry: DX482ConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_state"
 
     @property
-    def native_value(self) -> str | None:
-        return self.coordinator.data.get(DATA_DOOR_STATE)
-
-
-class DX482RssiSensor(DX482Entity, SensorEntity):
-    entity_description = SensorEntityDescription(
-        key="rssi",
-        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
-        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-    )
-
-    def __init__(self, coordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{self._entry_id}_rssi"
+    def native_value(self) -> str:
+        s = self.session
+        if s.video_active:
+            return "streaming"
+        if s.call_active:
+            return "in_call"
+        if s.registered_at:
+            return "idle"
+        return "waiting_for_doorbell"
 
     @property
-    def native_value(self) -> int | None:
-        return self.coordinator.data.get(DATA_RSSI)
+    def extra_state_attributes(self) -> dict[str, object]:
+        s = self.session
+        return {
+            "proxy_logged_in": s.proxy_logged_in,
+            "rtp_video_packets": s.rtp_video_packets,
+            "registered_at": datetime.fromtimestamp(s.registered_at, tz=timezone.utc).isoformat() if s.registered_at else None,
+        }
+
+
+class DX482LastRingSensor(DX482Entity, SensorEntity):
+    _attr_translation_key = "last_ring"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:bell"
+
+    def __init__(self, entry: DX482ConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_last_ring"
+
+    @property
+    def native_value(self) -> datetime | None:
+        ts = self.session.last_ring_at
+        return datetime.fromtimestamp(ts, tz=timezone.utc) if ts else None

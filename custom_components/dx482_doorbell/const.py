@@ -5,40 +5,35 @@ from __future__ import annotations
 DOMAIN = "dx482_doorbell"
 
 # Config entry keys
-CONF_HOST = "host"
-CONF_CONTROL_PORT = "control_port"
-CONF_RTSP_PORT = "rtsp_port"
-CONF_RTSP_USERNAME = "rtsp_username"
-CONF_RTSP_PASSWORD = "rtsp_password"
-CONF_RTSP_CHANNEL = "rtsp_channel"
-CONF_NAME = "name"
-CONF_SCAN_INTERVAL = "scan_interval"
-CONF_ENABLE_LOCK = "enable_lock"
-CONF_RING_ENABLED = "ring_enabled"
-CONF_RING_POLL_MS = "ring_poll_ms"
+CONF_HOST = "host"                  # doorbell IP
+CONF_LOCAL_IP = "local_ip"          # this HA host's LAN IP (what the doorbell's [server] points to)
+CONF_DEVICE_ACCOUNT = "device_account"   # doorbell SIP account, e.g. 64000002db48
+CONF_PHONE_ACCOUNT = "phone_account"     # "divert"/phone SIP account, e.g. 6e000002db48
+CONF_MON_CODE = "mon_code"          # monitor code sent to start video, e.g. 0x34
+CONF_SIP_PORT = "sip_port"
+CONF_PROXY_PORT = "proxy_port"
+CONF_AUDIO_PORT = "audio_port"
+CONF_VIDEO_PORT = "video_port"
+CONF_IDLE_TIMEOUT = "idle_timeout"
+CONF_AUTO_ANSWER = "auto_answer"
+CONF_RELAY_COUNT = "relay_count"
 
 # Defaults
 DEFAULT_NAME = "DX482 Doorbell"
-DEFAULT_CONTROL_PORT = 8765
-DEFAULT_RTSP_PORT = 554
-DEFAULT_RTSP_USERNAME = "admin"
-DEFAULT_RTSP_PASSWORD = "1234abcd"
-DEFAULT_RTSP_CHANNEL = "101"  # 101 = main/high-res, 102 = sub/low-res
-DEFAULT_SCAN_INTERVAL = 60  # seconds; device is fragile, poll gently
-DEFAULT_RING_ENABLED = True
-DEFAULT_RING_POLL_MS = 200  # call-log poll interval on a persistent connection
+DEFAULT_MON_CODE = "0x34"
+DEFAULT_SIP_PORT = 5068
+DEFAULT_PROXY_PORT = 8850
+DEFAULT_AUDIO_PORT = 30000
+DEFAULT_VIDEO_PORT = 30002
+DEFAULT_IDLE_TIMEOUT = 30
+DEFAULT_AUTO_ANSWER = False
+DEFAULT_RELAY_COUNT = 1
+DEVICE_SIP_PORT = 5069
 
-MANUFACTURER = "2easy"
+MANUFACTURER = "2easy / V-Tec"
 MODEL = "DX482"
 
-# Webhook / event
+# Events / signals
 EVENT_RING = "ring"
-EVENT_MOTION = "motion"
 SIGNAL_DOORBELL_EVENT = f"{DOMAIN}_event"
-
-# Coordinator data keys
-DATA_AVAILABLE = "available"
-DATA_DOOR_STATE = "door_state"
-DATA_DOOR_STATE_RAW = "door_state_raw"
-DATA_DOOR_OPEN = "door_open"
-DATA_RSSI = "rssi"
+SIGNAL_STATE = f"{DOMAIN}_state"

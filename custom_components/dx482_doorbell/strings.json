@@ -2,20 +2,19 @@
   "config": {
     "step": {
       "user": {
-        "title": "2easy DX482 Video Doorbell",
-        "description": "Connect directly to the doorbell on your LAN. No cloud account is used.",
+        "title": "2easy / V-Tec DX482 Video Doorbell",
+        "description": "Home Assistant will act as the doorbell's server. After setup, set the doorbell's [server] to this host's IP (see README).",
         "data": {
-          "host": "IP address",
-          "control_port": "Control port (binary protocol)",
-          "rtsp_port": "RTSP port",
-          "rtsp_username": "RTSP username",
-          "rtsp_password": "RTSP password",
-          "rtsp_channel": "RTSP channel (101 = main, 102 = sub)"
+          "host": "Doorbell IP address",
+          "local_ip": "This Home Assistant host's LAN IP",
+          "device_account": "Doorbell SIP account (e.g. 64000002db48)",
+          "phone_account": "Phone/divert SIP account (e.g. 6e000002db48)",
+          "mon_code": "Monitor code (e.g. 0x34)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Could not reach the doorbell on the control port. Check the IP address and that the device is online."
+      "port_in_use": "UDP 5068 or TCP 8850 is already in use on this host."
     },
     "abort": {
       "already_configured": "This doorbell is already configured."
@@ -26,50 +25,35 @@
       "init": {
         "title": "DX482 options",
         "data": {
-          "scan_interval": "Poll interval (seconds)",
-          "rtsp_channel": "RTSP channel (101 = main, 102 = sub)",
-          "ring_enabled": "Built-in ring detection (poll call log)",
-          "ring_poll_ms": "Ring poll interval (ms)"
+          "mon_code": "Monitor code",
+          "idle_timeout": "End call after idle (seconds)",
+          "auto_answer": "Auto-answer when the doorbell rings (enables video/unlock during the ring)",
+          "relay_count": "Number of door relays",
+          "sip_port": "SIP port (doorbell [server] port)",
+          "proxy_port": "Media proxy port",
+          "audio_port": "Audio RTP port",
+          "video_port": "Video RTP port"
         }
       }
     }
   },
   "entity": {
     "button": {
-      "open_door": {
-        "name": "Open door"
-      }
+      "open_door": { "name": "Open door" },
+      "open_door_2": { "name": "Open door 2" },
+      "light": { "name": "Light" },
+      "hangup": { "name": "Hang up" }
     },
-    "lock": {
-      "door_lock": {
-        "name": "Door"
-      }
-    },
-    "camera": {
-      "camera": {
-        "name": "Camera"
-      }
-    },
-    "sensor": {
-      "door_state": {
-        "name": "Door state"
-      },
-      "rssi": {
-        "name": "Wi-Fi signal"
-      }
-    },
+    "camera": { "camera": { "name": "Camera" } },
     "binary_sensor": {
-      "door_open": {
-        "name": "Door"
-      },
-      "ring": {
-        "name": "Ringing"
-      }
+      "ring": { "name": "Ringing" },
+      "call_active": { "name": "Call" },
+      "registered": { "name": "Doorbell connected" }
     },
-    "event": {
-      "doorbell": {
-        "name": "Doorbell"
-      }
+    "event": { "doorbell": { "name": "Doorbell" } },
+    "sensor": {
+      "session_state": { "name": "Session" },
+      "last_ring": { "name": "Last ring" }
     }
   }
 }

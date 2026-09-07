@@ -1,36 +1,52 @@
-"""The 2easy DX482 Video Doorbell integration (direct-LAN, no cloud)."""
+"""2easy / V-Tec DX482 video doorbell — fully local integration.
+
+Home Assistant impersonates the doorbell's vendor cloud: a SIP registrar plus the
+media proxy the doorbell dials into during calls.  Point the doorbell's
+``[server]`` setting at this Home Assistant host and everything (ring, video,
+unlock) works on the LAN with no internet.
+"""
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryNotReady as ConfigEntryNotReadyError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import (
-    CONF_CONTROL_PORT,
+    CONF_AUDIO_PORT,
+    CONF_AUTO_ANSWER,
+    CONF_DEVICE_ACCOUNT,
     CONF_HOST,
-    CONF_RING_ENABLED,
-    CONF_RING_POLL_MS,
-    CONF_SCAN_INTERVAL,
-    DEFAULT_CONTROL_PORT,
-    DEFAULT_RING_ENABLED,
-    DEFAULT_RING_POLL_MS,
-    DEFAULT_SCAN_INTERVAL,
+    CONF_IDLE_TIMEOUT,
+    CONF_LOCAL_IP,
+    CONF_MON_CODE,
+    CONF_PHONE_ACCOUNT,
+    CONF_PROXY_PORT,
+    CONF_SIP_PORT,
+    CONF_VIDEO_PORT,
+    DEFAULT_AUDIO_PORT,
+    DEFAULT_AUTO_ANSWER,
+    DEFAULT_IDLE_TIMEOUT,
+    DEFAULT_MON_CODE,
+    DEFAULT_PROXY_PORT,
+    DEFAULT_SIP_PORT,
+    DEFAULT_VIDEO_PORT,
+    DEVICE_SIP_PORT,
     DOMAIN,
-    EVENT_MOTION,
-    EVENT_RING,
     MANUFACTURER,
     MODEL,
     SIGNAL_DOORBELL_EVENT,
+    SIGNAL_STATE,
 )
-from .coordinator import DX482Coordinator
-from .protocol import DX482Client
-from .ring_poller import RingPoller
+from .session import EVENT_RING, DX482Session
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +55,6 @@ PLATFORMS: list[Platform] = [
     Platform.BUTTON,
     Platform.CAMERA,
     Platform.EVENT,
-    Platform.LOCK,
     Platform.SENSOR,
 ]
 
@@ -48,122 +63,70 @@ PLATFORMS: list[Platform] = [
 class DX482Data:
     """Runtime data stored on the config entry."""
 
-    client: DX482Client
-    coordinator: DX482Coordinator
-    ring_poller: RingPoller | None = None
+    session: DX482Session
+    state: dict[str, Any] = field(default_factory=dict)
 
 
 type DX482ConfigEntry = ConfigEntry[DX482Data]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> bool:
-    """Set up DX482 doorbell from a config entry."""
-    host = entry.data[CONF_HOST]
-    control_port = entry.data.get(CONF_CONTROL_PORT, DEFAULT_CONTROL_PORT)
-    scan_interval = entry.options.get(
-        CONF_SCAN_INTERVAL,
-        entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+    cfg = {**entry.data, **entry.options}
+    state: dict[str, Any] = {"call": "idle", "proxy": "disconnected", "video": "off", "registered": False}
+
+    @callback
+    def _on_event(event: str, data: Any) -> None:
+        if event == EVENT_RING:
+            state["last_ring"] = time.time()
+            async_dispatcher_send(hass, f"{SIGNAL_DOORBELL_EVENT}_{entry.entry_id}", "ring")
+        elif event == "registered":
+            state["registered"] = bool(data)
+        else:
+            state[event] = data
+        async_dispatcher_send(hass, f"{SIGNAL_STATE}_{entry.entry_id}")
+
+    session = DX482Session(
+        local_ip=cfg[CONF_LOCAL_IP],
+        device_ip=cfg[CONF_HOST],
+        device_user=cfg[CONF_DEVICE_ACCOUNT],
+        phone_user=cfg[CONF_PHONE_ACCOUNT],
+        mon_code=cfg.get(CONF_MON_CODE, DEFAULT_MON_CODE),
+        sip_port=cfg.get(CONF_SIP_PORT, DEFAULT_SIP_PORT),
+        proxy_port=cfg.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT),
+        audio_port=cfg.get(CONF_AUDIO_PORT, DEFAULT_AUDIO_PORT),
+        video_port=cfg.get(CONF_VIDEO_PORT, DEFAULT_VIDEO_PORT),
+        device_sip_port=DEVICE_SIP_PORT,
+        idle_timeout=cfg.get(CONF_IDLE_TIMEOUT, DEFAULT_IDLE_TIMEOUT),
+        auto_answer=cfg.get(CONF_AUTO_ANSWER, DEFAULT_AUTO_ANSWER),
+        on_event=_on_event,
     )
+    try:
+        await session.start()
+    except OSError as err:
+        raise ConfigEntryNotReadyError(f"cannot bind local ports: {err}") from err
 
-    client = DX482Client(host, control_port)
-    coordinator = DX482Coordinator(hass, entry, client, scan_interval)
-    await coordinator.async_config_entry_first_refresh()
+    entry.runtime_data = DX482Data(session=session, state=state)
 
-    entry.runtime_data = DX482Data(client=client, coordinator=coordinator)
-
-    # Register the device up front so entities attach cleanly.
-    device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
+    dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
         manufacturer=MANUFACTURER,
         model=MODEL,
         name=entry.title,
-        configuration_url=f"http://{host}",
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    _register_webhook(hass, entry)
-
-    # Built-in local ring detection: poll the call log on a persistent socket.
-    opts = {**entry.data, **entry.options}
-    if opts.get(CONF_RING_ENABLED, DEFAULT_RING_ENABLED):
-        poller = RingPoller(
-            hass,
-            entry.entry_id,
-            client,
-            opts.get(CONF_RING_POLL_MS, DEFAULT_RING_POLL_MS),
-        )
-        poller.start()
-        entry.runtime_data.ring_poller = poller
-
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> bool:
-    """Unload a config entry."""
-    _unregister_webhook(hass, entry)
-    if entry.runtime_data.ring_poller is not None:
-        await entry.runtime_data.ring_poller.stop()
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    await entry.runtime_data.session.stop()
+    return ok
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: DX482ConfigEntry) -> None:
-    """Reload when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-# --- Webhook for ring / motion events -------------------------------------
-#
-# The doorbell's own ring signalling is SIP (cloud) and not observable on the
-# LAN without packet capture.  Rather than depend on the cloud, this
-# integration exposes a local webhook that an external notifier (a router-side
-# tcpdump/SIP script, Frigate motion, an ONVIF event bridge, etc.) can POST to
-# in order to raise a ring or motion event inside Home Assistant.
-#
-#   POST /api/webhook/<webhook_id>            -> ring
-#   POST /api/webhook/<webhook_id>  {"event":"motion"}  -> motion
-
-
-def _webhook_id(entry: DX482ConfigEntry) -> str:
-    return f"{DOMAIN}_{entry.entry_id}"
-
-
-@callback
-def _register_webhook(hass: HomeAssistant, entry: DX482ConfigEntry) -> None:
-    from homeassistant.components import webhook
-
-    webhook_id = _webhook_id(entry)
-
-    async def _handle(hass: HomeAssistant, webhook_id: str, request):
-        event = EVENT_RING
-        try:
-            if request.can_read_body:
-                body = await request.json()
-                if isinstance(body, dict):
-                    event = body.get("event", EVENT_RING)
-        except (ValueError, TypeError):
-            event = EVENT_RING
-        if event not in (EVENT_RING, EVENT_MOTION):
-            event = EVENT_RING
-        _LOGGER.debug("Doorbell webhook fired: %s", event)
-        async_dispatcher_send(hass, f"{SIGNAL_DOORBELL_EVENT}_{entry.entry_id}", event)
-
-    try:
-        webhook.async_register(
-            hass, DOMAIN, entry.title, webhook_id, _handle, local_only=True
-        )
-    except ValueError:
-        # Already registered (e.g. after a reload race) — safe to ignore.
-        _LOGGER.debug("Webhook %s already registered", webhook_id)
-
-
-@callback
-def _unregister_webhook(hass: HomeAssistant, entry: DX482ConfigEntry) -> None:
-    from homeassistant.components import webhook
-
-    try:
-        webhook.async_unregister(hass, _webhook_id(entry))
-    except (ValueError, KeyError):
-        pass
