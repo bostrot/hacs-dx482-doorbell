@@ -170,6 +170,7 @@ class DX482Session:
     # ------------------------------------------------------------------ SIP
     def _sip_send(self, data: bytes, addr: tuple[str, int]) -> None:
         if self._sip and self._sip.transport:
+            _LOGGER.debug("SIP -> %s: %s", addr, vdp.sip_first_line(data))
             self._sip.transport.sendto(data, addr)
 
     def _on_sip(self, data: bytes, addr: tuple[str, int]) -> None:
@@ -183,15 +184,13 @@ class DX482Session:
             return
         method = first.split(" ", 1)[0]
         if method in ("REGISTER", "OPTIONS"):
-            extra = ""
-            if method == "REGISTER":
-                # eXosip only treats the registration as successful when the 200 OK
-                # echoes its Contact binding with an expiry (mirrors the vendor OpenSIPS).
-                contact = vdp.sip_header(text, "Contact") or ""
-                if contact and ";expires=" not in contact:
-                    contact = f"{contact};expires=3600"
-                extra = (f"Contact: {contact}\r\n" if contact else "") + "Expires: 3600\r\n"
-            self._sip_send(vdp.sip_response(text, 200, "OK", extra), addr)
+            # Mirror exactly what the doorbell accepted from the standalone stand-in:
+            # echoed Via/From/To/Call-ID/CSeq (no To tag), its Contact untouched, Expires.
+            contact = vdp.sip_header(text, "Contact") or ""
+            extra = (f"Contact: {contact}\r\n" if contact else "") + ("Expires: 3600\r\n" if method == "REGISTER" else "")
+            rsp = vdp.sip_response(text, 200, "OK", extra, to_tag=False)
+            _LOGGER.debug("SIP -> %s: %s", addr, rsp.decode("utf-8", "replace").replace("\r\n", " | ")[:400])
+            self._sip_send(rsp, addr)
             if method == "REGISTER" and addr[0] == self.device_ip:
                 first_time = self.registered_at is None
                 self.registered_at = time.time()

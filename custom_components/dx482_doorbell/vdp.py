@@ -144,10 +144,10 @@ def sip_echo_headers(text: str) -> str:
     )
 
 
-def sip_response(request: str, code: int, reason: str, extra: str = "", body: str = "") -> bytes:
+def sip_response(request: str, code: int, reason: str, extra: str = "", body: str = "", to_tag: bool = True) -> bytes:
     to_line = sip_header(request, "To") or ""
     hdrs = sip_echo_headers(request)
-    if code >= 200 and ";tag=" not in to_line:
+    if to_tag and code >= 200 and ";tag=" not in to_line:
         # Add a To tag on final responses so the dialog is well formed.
         hdrs = re.sub(r"^(To\s*:.*?)$", rf"\1;tag={random.randint(1, 1 << 31):x}", hdrs, flags=re.M | re.I)
     msg = f"SIP/2.0 {code} {reason}\r\n{hdrs}\r\n"
