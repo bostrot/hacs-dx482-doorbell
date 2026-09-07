@@ -126,6 +126,20 @@
       },
       "call_tune_time": {
         "name": "Ring duration"
+      },
+      "auto_unlock_start": {
+        "name": "Auto unlock start hour"
+      },
+      "auto_unlock_end": {
+        "name": "Auto unlock end hour"
+      }
+    },
+    "switch": {
+      "auto_unlock": {
+        "name": "Auto unlock"
+      },
+      "auto_close_after_unlock": {
+        "name": "Auto close after unlock"
       }
     }
   }

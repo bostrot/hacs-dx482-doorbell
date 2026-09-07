@@ -54,9 +54,20 @@ PARAMS: dict[str, Param] = {
         Param("1054", "speaker_volume", "Speaker volume", 0, 0, 30),
         Param("1035", "doorbell_tune", "Doorbell tune", 4, 0, 255),
         Param("1029", "call_tune_time", "Ring duration", 35, 3, 255, "s"),
+        Param("1726", "auto_unlock_start", "Auto unlock start hour", 0, 0, 23, "h"),
+        Param("1727", "auto_unlock_end", "Auto unlock end hour", 23, 0, 23, "h"),
     )
 }
-PARAMS_BY_ID = {p.para_id: p for p in PARAMS.values()}
+
+# Boolean parameters exposed as switches.
+BOOL_PARAMS: dict[str, Param] = {
+    p.key: p
+    for p in (
+        Param("1248", "auto_unlock", "Auto unlock", 0, 0, 1),
+        Param("1157", "auto_close_after_unlock", "Auto close after unlock", 0, 0, 1),
+    )
+}
+PARAMS_BY_ID = {p.para_id: p for p in (*PARAMS.values(), *BOOL_PARAMS.values())}
 
 
 class DeviceConfig:
@@ -140,14 +151,14 @@ class DeviceConfig:
         return self.values
 
     def get(self, key: str) -> int:
-        p = PARAMS[key]
+        p = PARAMS.get(key) or BOOL_PARAMS[key]
         try:
             return int(self.values.get(p.para_id, p.default))
         except ValueError:
             return p.default
 
     async def async_set(self, key: str, value: int) -> None:
-        p = PARAMS[key]
+        p = PARAMS.get(key) or BOOL_PARAMS[key]
         value = max(p.min, min(p.max, int(value)))
         raw = await asyncio.to_thread(self._read, VALUES_FILE)
         doc = json.loads(raw.decode("utf-8", "replace"))

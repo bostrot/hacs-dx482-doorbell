@@ -95,6 +95,8 @@ as **number** entities under the device's Configuration section:
 | Divert delay | `DivertTime` (how long the indoor monitor rings before the doorbell calls Home Assistant) | 30 s |
 | Day / night call volume, Talk volume, Microphone / Speaker volume | `*_VOLUME*` | |
 | Doorbell tune, Ring duration | `DOORBELL_TUNE_SELECT`, `CALL_TUNE_TIME_LIMIT` | |
+| **Auto unlock** (switch) + start/end hour | `AutoUnlockIo`, `AutoUnlockStartTime`, `AutoUnlockEndTime` (doorbell opens the door by itself during those hours) | off |
+| Auto close after unlock (switch) | `AutoCloseAfterUnlock` | off |
 
 Changing a value writes it immediately; the **Reboot required** sensor turns on and the
 **Reboot doorbell** button applies it (the doorbell is offline for about two minutes).
