@@ -23,6 +23,7 @@ from collections.abc import Callable
 from typing import Any
 
 from . import vdp
+from .h264 import parse_sps
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ class DX482Session:
         self._consumers: dict[int, dict[str, Any]] = {}  # tcp port -> {server, writers}
         self._sps: bytes | None = None
         self._pps: bytes | None = None
+        self.video_resolution: tuple[int, int, int] | None = None  # (w, h, profile_idc)
         self._fu_type = 0
         self._lock = asyncio.Lock()
         self._last_activity = 0.0
@@ -374,6 +376,10 @@ class DX482Session:
     def _cache_param(self, t: int, unit: bytes) -> None:
         if t == 7:
             self._sps = b"\x00\x00\x00\x01" + unit
+            res = parse_sps(unit)
+            if res and res != self.video_resolution:
+                self.video_resolution = res
+                _LOGGER.info("doorbell video stream: %dx%d (H.264 profile %d)", *res)
         elif t == 8:
             self._pps = b"\x00\x00\x00\x01" + unit
 

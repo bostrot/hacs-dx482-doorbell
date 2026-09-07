@@ -43,6 +43,7 @@ class DX482StateSensor(DX482Entity, SensorEntity):
         return {
             "proxy_logged_in": s.proxy_logged_in,
             "rtp_video_packets": s.rtp_video_packets,
+            "video_resolution": f"{s.video_resolution[0]}x{s.video_resolution[1]}" if s.video_resolution else None,
             "registered_at": datetime.fromtimestamp(s.registered_at, tz=timezone.utc).isoformat() if s.registered_at else None,
         }
 
