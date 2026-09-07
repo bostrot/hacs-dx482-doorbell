@@ -8,7 +8,7 @@ Lifecycle of a video/unlock session:
      sends a status frame which we acknowledge.
   3. We send the monitor code -> the doorbell pushes H.264 RTP to our video port.
   4. Control commands (unlock, light) are sent on the same proxy link.
-  5. RTP is fanned out to local UDP ports where ffmpeg consumers (MJPEG / stills) listen.
+  5. RTP is depacketized to Annex-B H.264 and served on local TCP ports to ffmpeg consumers.
 A ring is an INVITE *from* the doorbell to us (it calls the phone account).
 """
 
@@ -16,11 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import random
 import re
-import socket
-import tempfile
 import time
 from collections.abc import Callable
 from typing import Any
@@ -105,11 +102,13 @@ class DX482Session:
         self._dialog: vdp.Dialog | None = None
         self._incoming: dict[str, str] | None = None   # headers of the doorbell's INVITE (ring)
         self._video_on = False
-        self._consumers: dict[int, socket.socket] = {}  # loop port -> sending socket
+        self._consumers: dict[int, dict[str, Any]] = {}  # tcp port -> {server, writers}
+        self._sps: bytes | None = None
+        self._pps: bytes | None = None
+        self._fu_type = 0
         self._lock = asyncio.Lock()
         self._last_activity = 0.0
         self._idle_task: asyncio.Task | None = None
-        self._tmpdir = tempfile.mkdtemp(prefix="dx482_")
         self.registered_at: float | None = None
         self.last_ring_at: float | None = None
         self.rtp_video_packets = 0
@@ -143,9 +142,8 @@ class DX482Session:
             t.close()
         if self._sip and self._sip.transport:
             self._sip.transport.close()
-        for s in self._consumers.values():
-            s.close()
-        self._consumers.clear()
+        for port in list(self._consumers):
+            self.remove_consumer(port)
 
     # ------------------------------------------------------------------ properties
     @property
@@ -187,7 +185,7 @@ class DX482Session:
         if method in ("REGISTER", "OPTIONS"):
             extra = "Expires: 3600\r\n" if method == "REGISTER" else ""
             self._sip_send(vdp.sip_response(text, 200, "OK", extra), addr)
-            if method == "REGISTER":
+            if method == "REGISTER" and addr[0] == self.device_ip:
                 first_time = self.registered_at is None
                 self.registered_at = time.time()
                 if first_time:
@@ -320,7 +318,7 @@ class DX482Session:
             self._pending_acks.pop(sub, None)
             raise TimeoutError(f"no ack for control sub={sub}") from err
 
-    # ------------------------------------------------------------------ RTP
+    # ------------------------------------------------------------------ RTP -> H.264 fan-out
     def _on_rtp(self, kind: str, data: bytes, addr) -> None:
         if kind != "video":
             return
@@ -328,49 +326,103 @@ class DX482Session:
         self.last_rtp_at = time.time()
         if not self._video_on and self._logged_in.is_set():
             self._set_video(True)
-        for port, sock in self._consumers.items():
-            try:
-                sock.sendto(data, ("127.0.0.1", port))
-            except OSError:
-                pass
+        nal = self._depacketize(data)
+        if nal:
+            self._broadcast(nal)
+
+    def _depacketize(self, pkt: bytes) -> bytes:
+        """RFC 6184 -> Annex-B bytes (single NAL, STAP-A, FU-A). Caches SPS/PPS for late joiners."""
+        if len(pkt) < 13:
+            return b""
+        cc = pkt[0] & 0x0F
+        hdr = 12 + 4 * cc
+        if pkt[0] & 0x10 and len(pkt) >= hdr + 4:
+            hdr += 4 + 4 * int.from_bytes(pkt[hdr + 2:hdr + 4], "big")
+        p = pkt[hdr:]
+        if not p:
+            return b""
+        t = p[0] & 0x1F
+        out = b""
+        if 1 <= t <= 23:
+            out = b"\x00\x00\x00\x01" + p
+            self._cache_param(t, p)
+        elif t == 24:  # STAP-A
+            j = 1
+            while j + 2 <= len(p):
+                sz = int.from_bytes(p[j:j + 2], "big")
+                j += 2
+                unit = p[j:j + sz]
+                j += sz
+                if unit:
+                    out += b"\x00\x00\x00\x01" + unit
+                    self._cache_param(unit[0] & 0x1F, unit)
+        elif t == 28 and len(p) >= 2:  # FU-A
+            start, fu_type = p[1] & 0x80, p[1] & 0x1F
+            if start:
+                out = b"\x00\x00\x00\x01" + bytes([(p[0] & 0xE0) | fu_type]) + p[2:]
+                self._fu_type = fu_type
+            else:
+                out = p[2:]
+        return out
+
+    def _cache_param(self, t: int, unit: bytes) -> None:
+        if t == 7:
+            self._sps = b"\x00\x00\x00\x01" + unit
+        elif t == 8:
+            self._pps = b"\x00\x00\x00\x01" + unit
+
+    def _broadcast(self, data: bytes) -> None:
+        for port, cons in list(self._consumers.items()):
+            for w in list(cons["writers"]):
+                if w.is_closing():
+                    cons["writers"].discard(w)
+                    continue
+                try:
+                    w.write(data)
+                except (ConnectionError, OSError):
+                    cons["writers"].discard(w)
 
     def _set_video(self, on: bool) -> None:
         if self._video_on != on:
             self._video_on = on
             self._emit(EVENT_VIDEO, "on" if on else "off")
 
-    def add_consumer(self) -> tuple[int, str]:
-        """Register an RTP consumer; returns (udp port, path to SDP file) for ffmpeg."""
-        for _ in range(50):
-            port = random.randint(40000, 50000)
-            if port in self._consumers:
-                continue
-            probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    async def add_consumer(self) -> tuple[int, str]:
+        """Start a local TCP server that streams raw Annex-B H.264 to whoever connects.
+
+        Returns (port, ffmpeg input string).  The input string carries the input
+        options because HA's ffmpeg helper appends ``extra_cmd`` after the output.
+        """
+        cons: dict[str, Any] = {"writers": set()}
+
+        async def on_conn(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+            # Prime late joiners with the last parameter sets so decoding can start at the next IDR.
+            for unit in (self._sps, self._pps):
+                if unit:
+                    writer.write(unit)
+            cons["writers"].add(writer)
             try:
-                probe.bind(("127.0.0.1", port))
-            except OSError:
-                probe.close()
-                continue
-            probe.close()
-            break
-        else:
-            raise OSError("no free consumer port")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._consumers[port] = sock
-        sdp_path = os.path.join(self._tmpdir, f"video_{port}.sdp")
-        with open(sdp_path, "w", encoding="ascii") as fh:
-            fh.write(vdp.sdp_for_ffmpeg(port))
+                await reader.read()  # wait for the client to go away
+            except (ConnectionError, OSError):
+                pass
+            finally:
+                cons["writers"].discard(writer)
+                writer.close()
+
+        server = await asyncio.start_server(on_conn, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        cons["server"] = server
+        self._consumers[port] = cons
         self._touch()
-        return port, sdp_path
+        return port, f"-f h264 -fflags nobuffer -flags low_delay -i tcp://127.0.0.1:{port}"
 
     def remove_consumer(self, port: int) -> None:
-        sock = self._consumers.pop(port, None)
-        if sock:
-            sock.close()
-        try:
-            os.remove(os.path.join(self._tmpdir, f"video_{port}.sdp"))
-        except OSError:
-            pass
+        cons = self._consumers.pop(port, None)
+        if not cons:
+            return
+        for w in list(cons["writers"]):
+            w.close()
+        cons["server"].close()
         self._touch()
 
     # ------------------------------------------------------------------ high level actions

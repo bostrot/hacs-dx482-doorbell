@@ -11,5 +11,5 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/bostrot/hacs-dx482-doorbell/issues",
   "requirements": [],
-  "version": "0.2.0"
+  "version": "0.2.1"
 }

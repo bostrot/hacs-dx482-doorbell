@@ -18,7 +18,6 @@ from . import DX482ConfigEntry
 from .entity import DX482Entity
 
 _LOGGER = logging.getLogger(__name__)
-FFMPEG_INPUT_ARGS = "-protocol_whitelist file,udp,rtp -fflags nobuffer -flags low_delay"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -45,17 +44,15 @@ class DX482Camera(DX482Entity, Camera):
     async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
         try:
             await self._ensure_video()
-            port, sdp = self.session.add_consumer()
+            port, src = await self.session.add_consumer()
         except (TimeoutError, ConnectionError, OSError) as err:
             _LOGGER.warning("Snapshot failed: %s", err)
             return self._last_image
         try:
             frame = ImageFrame(get_ffmpeg_manager(self.hass).binary)
-            image = await asyncio.wait_for(
-                frame.get_image(sdp, output_format=IMAGE_JPEG, extra_cmd=FFMPEG_INPUT_ARGS), timeout=15
-            )
+            image = await asyncio.wait_for(frame.get_image(src, output_format=IMAGE_JPEG), timeout=20)
         except (asyncio.TimeoutError, OSError) as err:
-            _LOGGER.debug("ffmpeg still failed: %s", err)
+            _LOGGER.warning("ffmpeg still capture failed: %s", err)
             image = None
         finally:
             self.session.remove_consumer(port)
@@ -66,12 +63,12 @@ class DX482Camera(DX482Entity, Camera):
     async def handle_async_mjpeg_stream(self, request: web.Request) -> web.StreamResponse | None:
         try:
             await self._ensure_video()
-            port, sdp = self.session.add_consumer()
+            port, src = await self.session.add_consumer()
         except (TimeoutError, ConnectionError, OSError) as err:
             _LOGGER.warning("Live view failed: %s", err)
             return None
         stream = CameraMjpeg(get_ffmpeg_manager(self.hass).binary)
-        await stream.open_camera(sdp, extra_cmd=FFMPEG_INPUT_ARGS + " -q:v 4")
+        await stream.open_camera(src, extra_cmd="-q:v 4")
         try:
             reader = await stream.get_reader()
             return await async_aiohttp_proxy_stream(self.hass, request, reader, get_ffmpeg_manager(self.hass).ffmpeg_stream_content_type)
