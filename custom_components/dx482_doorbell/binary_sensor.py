@@ -17,7 +17,7 @@ RING_HOLD_SECONDS = 5
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    async_add_entities([DX482RingSensor(entry), DX482CallSensor(entry), DX482RegisteredSensor(entry)])
+    async_add_entities([DX482RingSensor(entry), DX482CallSensor(entry), DX482RegisteredSensor(entry), DX482RebootRequiredSensor(entry)])
 
 
 class DX482RingSensor(DX482Entity, BinarySensorEntity):
@@ -79,3 +79,23 @@ class DX482RegisteredSensor(DX482Entity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         return self.session.registered_at is not None
+
+
+class DX482RebootRequiredSensor(DX482Entity, BinarySensorEntity):
+    _attr_translation_key = "reboot_required"
+    _attr_device_class = BinarySensorDeviceClass.UPDATE
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, entry: DX482ConfigEntry) -> None:
+        super().__init__(entry)
+        self._attr_unique_id = f"{entry.entry_id}_reboot_required"
+
+    @property
+    def is_on(self) -> bool:
+        cfg = self._entry.runtime_data.device_config
+        return bool(cfg and cfg.reboot_required)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        cfg = self._entry.runtime_data.device_config
+        return {"doorbell_sip_server": cfg.sip_server if cfg else None}

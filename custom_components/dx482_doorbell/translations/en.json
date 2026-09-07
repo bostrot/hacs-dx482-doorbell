@@ -39,21 +39,94 @@
   },
   "entity": {
     "button": {
-      "open_door": { "name": "Open door" },
-      "open_door_2": { "name": "Open door 2" },
-      "light": { "name": "Light" },
-      "hangup": { "name": "Hang up" }
+      "open_door": {
+        "name": "Open door"
+      },
+      "open_door_2": {
+        "name": "Open door 2"
+      },
+      "light": {
+        "name": "Light"
+      },
+      "hangup": {
+        "name": "Hang up"
+      },
+      "reboot": {
+        "name": "Reboot doorbell"
+      },
+      "point_to_ha": {
+        "name": "Point doorbell at Home Assistant"
+      },
+      "restore_cloud": {
+        "name": "Restore vendor cloud"
+      }
     },
-    "camera": { "camera": { "name": "Camera" } },
+    "camera": {
+      "camera": {
+        "name": "Camera"
+      }
+    },
     "binary_sensor": {
-      "ring": { "name": "Ringing" },
-      "call_active": { "name": "Call" },
-      "registered": { "name": "Doorbell connected" }
+      "ring": {
+        "name": "Ringing"
+      },
+      "call_active": {
+        "name": "Call"
+      },
+      "registered": {
+        "name": "Doorbell connected"
+      },
+      "reboot_required": {
+        "name": "Reboot required"
+      }
     },
-    "event": { "doorbell": { "name": "Doorbell" } },
+    "event": {
+      "doorbell": {
+        "name": "Doorbell"
+      }
+    },
     "sensor": {
-      "session_state": { "name": "Session" },
-      "last_ring": { "name": "Last ring" }
+      "session_state": {
+        "name": "Session"
+      },
+      "last_ring": {
+        "name": "Last ring"
+      }
+    },
+    "number": {
+      "unlock_time": {
+        "name": "Unlock time"
+      },
+      "unlock2_time": {
+        "name": "Unlock 2 time"
+      },
+      "monitor_time_limit": {
+        "name": "Monitor time limit"
+      },
+      "divert_time": {
+        "name": "Divert delay"
+      },
+      "day_call_volume": {
+        "name": "Day call volume"
+      },
+      "night_call_volume": {
+        "name": "Night call volume"
+      },
+      "talk_volume": {
+        "name": "Talk volume"
+      },
+      "mic_volume": {
+        "name": "Microphone volume"
+      },
+      "speaker_volume": {
+        "name": "Speaker volume"
+      },
+      "doorbell_tune": {
+        "name": "Doorbell tune"
+      },
+      "call_tune_time": {
+        "name": "Ring duration"
+      }
     }
   }
-}
+}\n

@@ -81,6 +81,31 @@ The "Doorbell connected" sensor turns on once the doorbell has registered.
 | `binary_sensor` Call / Doorbell connected | Session and registration state |
 | `sensor` Session / Last ring | `idle`, `in_call`, `streaming`; timestamp of last ring |
 
+### Doorbell settings from Home Assistant
+
+The doorbell stores its own settings in `/mnt/nand1-2/Settings/io_data_value.json`
+and only reads them at boot. The integration edits that file over the doorbell's
+FTP service (`root`, empty password) and can reboot it over telnet, so these show up
+as **number** entities under the device's Configuration section:
+
+| Entity | Firmware parameter | Default |
+|---|---|---|
+| Unlock time / Unlock 2 time | `UNLOCK1_TIMING` / `UNLOCK2_TIMING` | 5 s |
+| Monitor time limit | `MONITOR_TIME_LIMIT` (max length of a video call) | 30 s |
+| Divert delay | `DivertTime` (how long the indoor monitor rings before the doorbell calls Home Assistant) | 30 s |
+| Day / night call volume, Talk volume, Microphone / Speaker volume | `*_VOLUME*` | |
+| Doorbell tune, Ring duration | `DOORBELL_TUNE_SELECT`, `CALL_TUNE_TIME_LIMIT` | |
+
+Changing a value writes it immediately; the **Reboot required** sensor turns on and the
+**Reboot doorbell** button applies it (the doorbell is offline for about two minutes).
+Values are re-read when the doorbell registers again. Set **Divert delay** low (e.g. 5 s)
+if you want ring events to reach Home Assistant quickly.
+
+Two more buttons (disabled by default) automate the one-time server change described
+above: **Point doorbell at Home Assistant** rewrites `sipcfg.cfg` to this host (keeping a
+backup) and **Restore vendor cloud** puts the original back. Press **Reboot doorbell**
+after either.
+
 ### Auto-answer on ring
 
 Off by default. When enabled (Configure → options), a ring is answered immediately so

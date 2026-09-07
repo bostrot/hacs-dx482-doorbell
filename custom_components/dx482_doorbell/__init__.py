@@ -46,6 +46,7 @@ from .const import (
     SIGNAL_DOORBELL_EVENT,
     SIGNAL_STATE,
 )
+from .device_config import DeviceConfig
 from .session import EVENT_RING, DX482Session
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ PLATFORMS: list[Platform] = [
     Platform.BUTTON,
     Platform.CAMERA,
     Platform.EVENT,
+    Platform.NUMBER,
     Platform.SENSOR,
 ]
 
@@ -65,6 +67,8 @@ class DX482Data:
 
     session: DX482Session
     state: dict[str, Any] = field(default_factory=dict)
+    device_config: DeviceConfig | None = None
+    notify: Any = None  # callback: push a state refresh to all entities
 
 
 type DX482ConfigEntry = ConfigEntry[DX482Data]
@@ -81,6 +85,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> boo
             async_dispatcher_send(hass, f"{SIGNAL_DOORBELL_EVENT}_{entry.entry_id}", "ring")
         elif event == "registered":
             state["registered"] = bool(data)
+            # The doorbell just (re)booted and registered: re-read its settings.
+            data = getattr(entry, "runtime_data", None)
+            if data is not None and data.device_config is not None:
+                hass.async_create_task(_refresh_device_config(entry))
         else:
             state[event] = data
         async_dispatcher_send(hass, f"{SIGNAL_STATE}_{entry.entry_id}")
@@ -105,7 +113,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> boo
     except OSError as err:
         raise ConfigEntryNotReadyError(f"cannot bind local ports: {err}") from err
 
-    entry.runtime_data = DX482Data(session=session, state=state)
+    device_config = DeviceConfig(cfg[CONF_HOST])
+    try:
+        await device_config.async_refresh()
+    except (OSError, ValueError) as err:
+        _LOGGER.warning("Could not read doorbell settings over FTP (%s); settings entities will retry on reboot", err)
+
+    @callback
+    def _notify() -> None:
+        async_dispatcher_send(hass, f"{SIGNAL_STATE}_{entry.entry_id}")
+
+    entry.runtime_data = DX482Data(session=session, state=state, device_config=device_config, notify=_notify)
 
     dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -118,6 +136,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> boo
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
+
+
+async def _refresh_device_config(entry: DX482ConfigEntry) -> None:
+    cfg = entry.runtime_data.device_config
+    try:
+        await cfg.async_refresh()
+        cfg.reboot_required = False
+    except (OSError, ValueError) as err:
+        _LOGGER.debug("settings refresh failed: %s", err)
+    if entry.runtime_data.notify:
+        entry.runtime_data.notify()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> bool:
