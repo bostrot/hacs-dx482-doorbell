@@ -194,6 +194,9 @@ class DX482Session:
             _LOGGER.debug("SIP -> %s: %s", addr, rsp.decode("utf-8", "replace").replace("\r\n", " | ")[:400])
             self._sip_send(rsp, addr)
             if method == "REGISTER" and addr[0] == self.device_ip:
+                if (self._dialog is not None or self._incoming is not None) and not self._logged_in.is_set():
+                    _LOGGER.debug("doorbell re-registered without a proxy link; clearing stale call state")
+                    self._end_call(notify=True)
                 first_time = self.registered_at is None
                 self.registered_at = time.time()
                 if first_time:
@@ -444,6 +447,10 @@ class DX482Session:
             self._touch()
             if self._call_established.is_set() and self._logged_in.is_set():
                 return
+            if (self._dialog is not None or self._incoming is not None) and not self._logged_in.is_set():
+                # Stale call (e.g. the doorbell rebooted mid-session): tear it down and start over.
+                _LOGGER.debug("stale call without proxy link; resetting")
+                await self._hangup_locked()
             if self._dialog is None and self._incoming is None:
                 self._call_failed = None
                 self._call_established.clear()

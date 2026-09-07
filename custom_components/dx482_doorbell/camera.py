@@ -58,6 +58,8 @@ class DX482Camera(DX482Entity, Camera):
             self.session.remove_consumer(port)
         if image:
             self._last_image = image
+        elif self._last_image is None:
+            _LOGGER.warning("No frame decoded from the doorbell stream (rtp packets so far: %d)", self.session.rtp_video_packets)
         return image or self._last_image
 
     async def handle_async_mjpeg_stream(self, request: web.Request) -> web.StreamResponse | None:
