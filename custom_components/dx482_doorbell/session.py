@@ -183,7 +183,14 @@ class DX482Session:
             return
         method = first.split(" ", 1)[0]
         if method in ("REGISTER", "OPTIONS"):
-            extra = "Expires: 3600\r\n" if method == "REGISTER" else ""
+            extra = ""
+            if method == "REGISTER":
+                # eXosip only treats the registration as successful when the 200 OK
+                # echoes its Contact binding with an expiry (mirrors the vendor OpenSIPS).
+                contact = vdp.sip_header(text, "Contact") or ""
+                if contact and ";expires=" not in contact:
+                    contact = f"{contact};expires=3600"
+                extra = (f"Contact: {contact}\r\n" if contact else "") + "Expires: 3600\r\n"
             self._sip_send(vdp.sip_response(text, 200, "OK", extra), addr)
             if method == "REGISTER" and addr[0] == self.device_ip:
                 first_time = self.registered_at is None
