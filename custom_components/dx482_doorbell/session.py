@@ -304,6 +304,10 @@ class DX482Session:
             self._logged_in.set()
             self._touch()
             self._emit(EVENT_PROXY, "logged_in")
+            if self._incoming is not None:
+                # We answered the doorbell's own (ring) call: start video right away so a
+                # snapshot/notification is warm and fast.
+                self._loop.create_task(self._auto_video())
         elif vdp.is_device_cmd(frame):
             writer.write(vdp.CMD_STATUS_OK)
             await writer.drain()
@@ -471,6 +475,12 @@ class DX482Session:
             except asyncio.TimeoutError as err:
                 await self._hangup_locked()
                 raise TimeoutError("doorbell did not answer / connect to proxy") from err
+
+    async def _auto_video(self) -> None:
+        try:
+            await self._send_ctrl(vdp.ctrl_open_video(self.mon_code))
+        except (TimeoutError, ConnectionError, OSError) as err:
+            _LOGGER.debug("auto video after ring failed: %s", err)
 
     async def start_video(self) -> None:
         await self.ensure_call()
