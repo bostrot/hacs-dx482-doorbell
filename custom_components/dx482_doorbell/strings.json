@@ -143,6 +143,11 @@
       "auto_close_after_unlock": {
         "name": "Auto close after unlock"
       }
+    },
+    "select": {
+      "call_mode": {
+        "name": "Call mode"
+      }
     }
   }
 }

@@ -68,7 +68,32 @@ BOOL_PARAMS: dict[str, Param] = {
         Param("1157", "auto_close_after_unlock", "Auto close after unlock", 0, 0, 1),
     )
 }
-PARAMS_BY_ID = {p.para_id: p for p in (*PARAMS.values(), *BOOL_PARAMS.values())}
+
+@dataclass(frozen=True)
+class SelectParam:
+    para_id: str
+    key: str
+    name: str
+    options: dict[str, str]  # value(str) -> label
+    default: str
+    live: bool = True  # menu-style params the app re-reads without a reboot
+
+
+SELECT_PARAMS: dict[str, SelectParam] = {
+    "call_mode": SelectParam(
+        "1040", "call_mode", "Call mode",
+        {
+            "0": "Normal",
+            "1": "Do not disturb 8h",
+            "2": "Do not disturb always",
+            "3": "Divert if no answer",
+            "4": "Divert always",
+        },
+        "0",
+    ),
+}
+
+PARAMS_BY_ID = {p.para_id: p for p in (*PARAMS.values(), *BOOL_PARAMS.values(), *SELECT_PARAMS.values())}
 
 
 class DeviceConfig:
@@ -168,6 +193,19 @@ class DeviceConfig:
         self.values = dict(doc["value"])
         self.reboot_required = True
         _LOGGER.info("Doorbell parameter %s (%s) set to %s; reboot required", p.name, p.para_id, value)
+
+    def get_str(self, para_id: str, default: str = "") -> str:
+        return str(self.values.get(para_id, default))
+
+    async def async_set_raw(self, para_id: str, value: str, *, reboot_required: bool = True) -> None:
+        raw = await asyncio.to_thread(self._read, VALUES_FILE)
+        doc = json.loads(raw.decode("utf-8", "replace"))
+        doc.setdefault("value", {})[para_id] = str(value)
+        await asyncio.to_thread(self._write, VALUES_FILE, json.dumps(doc, indent=8).encode())
+        self.values = dict(doc["value"])
+        if reboot_required:
+            self.reboot_required = True
+        _LOGGER.info("Doorbell param %s set to %s%s", para_id, value, "" if reboot_required else " (live)")
 
     async def async_reboot(self) -> None:
         await asyncio.to_thread(self._telnet, "sync; reboot")

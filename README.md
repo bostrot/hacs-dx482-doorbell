@@ -108,6 +108,15 @@ above: **Point doorbell at Home Assistant** rewrites `sipcfg.cfg` to this host (
 backup) and **Restore vendor cloud** puts the original back. Press **Reboot doorbell**
 after either.
 
+### Call mode (divert) from Home Assistant
+
+The doorbell's call-handling mode is a **Call mode** select entity (firmware
+`CallScene_SET`): Normal, Do-not-disturb 8h, Do-not-disturb always, Divert if no
+answer, **Divert always**. Set it to **Divert always** so a button press is
+forwarded to Home Assistant over SIP the instant it happens (real push, no polling).
+This applies live, without a reboot. It is the same setting as the doorbell's on-screen
+*Anrufeinstellungen → "Anruf immer weiterleiten"*.
+
 ### Ring detection without divert (call-log polling)
 
 The doorbell only sends a SIP call to Home Assistant when its **divert** mode is on,
