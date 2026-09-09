@@ -136,6 +136,23 @@ Off by default. When enabled (Configure → options), a ring is answered immedia
 the camera and unlock are usable during the ring. The doorbell then behaves as if a
 phone picked up.
 
+### Ring chime on speakers
+
+The integration ships a small set of chime sounds and, on startup, copies them into
+`<config>/www/dx482/` so Home Assistant serves them at `/local/dx482/<name>.mp3`
+(`ding_dong`, `doorbell`, `bright`, `chord`, `marimba`, `glockenspiel`, `bells`).
+Google Cast speakers only play audio from a URL they can reach, which on an isolated
+IoT network means Home Assistant's own IP, so play the chime by absolute URL:
+
+```yaml
+- action: media_player.play_media
+  target:
+    entity_id: media_player.google_home
+  data:
+    media_content_id: "http://<HA-IP>:8123/local/dx482/ding_dong.mp3"
+    media_content_type: music
+```
+
 ## Example automation
 
 ```yaml
