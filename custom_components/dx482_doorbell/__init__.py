@@ -9,8 +9,10 @@ unlock) works on the LAN with no internet.
 from __future__ import annotations
 
 import logging
+import shutil
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -82,8 +84,31 @@ class DX482Data:
 type DX482ConfigEntry = ConfigEntry[DX482Data]
 
 
+def _install_sounds(hass: HomeAssistant) -> None:
+    """Copy bundled chime sounds into <config>/www/dx482 so Home Assistant serves
+    them at /local/dx482/<name>.mp3.
+
+    Google Cast devices only play media from a URL they can reach; on isolated IoT
+    networks that means Home Assistant's own IP, never an external host. Serving the
+    chimes locally keeps ring sounds working with no internet.
+    """
+    src = Path(__file__).parent / "sounds"
+    if not src.is_dir():
+        return
+    dest = Path(hass.config.path("www", "dx482"))
+    dest.mkdir(parents=True, exist_ok=True)
+    for mp3 in src.glob("*.mp3"):
+        target = dest / mp3.name
+        try:
+            if not target.exists() or target.stat().st_size != mp3.stat().st_size:
+                shutil.copyfile(mp3, target)
+        except OSError as err:
+            _LOGGER.warning("Could not install chime %s: %s", mp3.name, err)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> bool:
     cfg = {**entry.data, **entry.options}
+    await hass.async_add_executor_job(_install_sounds, hass)
     state: dict[str, Any] = {"call": "idle", "proxy": "disconnected", "video": "off", "registered": False}
 
     @callback
