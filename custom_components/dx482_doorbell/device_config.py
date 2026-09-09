@@ -24,6 +24,7 @@ SETTINGS_DIR = "/mnt/nand1-2/Settings"
 VALUES_FILE = f"{SETTINGS_DIR}/io_data_value.json"
 SIPCFG_FILE = f"{SETTINGS_DIR}/sipcfg.cfg"
 SIPCFG_BACKUP = f"{SETTINGS_DIR}/sipcfg.cfg.orig"
+CALL_RECORD_FILE = "/mnt/nand1-2/UserData/call_record_table.csv"
 VENDOR_SERVER = "47.91.88.33"
 
 
@@ -184,6 +185,30 @@ class DeviceConfig:
         await asyncio.to_thread(self._write, SIPCFG_FILE, new.encode())
         self.sip_server = server_ip
         self.reboot_required = True
+
+    def _read_call_marker(self) -> tuple[str, str] | None:
+        """Newest door-station call in the device call log, as (sortable_key, raw_time).
+
+        A door call is a row with EVENT_TYPE 00 and EVENT_SUB_TYPE 01 (name 'DT-DS*').
+        The table is a ring buffer, so we scan every row for the maximum timestamp.
+        """
+        raw = self._read(CALL_RECORD_FILE).decode("utf-8", "replace")
+        best_key = ""
+        best_time = ""
+        for line in raw.splitlines():
+            if not line.startswith("value=,"):
+                continue
+            f = [x.strip() for x in line.split(",")]
+            if len(f) < 9 or f[1] != "00" or f[2] != "01":
+                continue
+            t = f[8].strip("/ -")  # "YY/MM/DD HH:MM"
+            key = "".join(ch for ch in t if ch.isdigit())  # "YYMMDDHHMM"
+            if len(key) == 10 and key > best_key:
+                best_key, best_time = key, t
+        return (best_key, best_time) if best_key else None
+
+    async def async_call_marker(self) -> tuple[str, str] | None:
+        return await asyncio.to_thread(self._read_call_marker)
 
     async def async_restore_vendor_cloud(self) -> None:
         if await asyncio.to_thread(self._exists, SIPCFG_BACKUP):

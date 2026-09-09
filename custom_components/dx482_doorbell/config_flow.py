@@ -11,6 +11,10 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
+    CONF_RING_POLL,
+    CONF_RING_POLL_INTERVAL,
+    DEFAULT_RING_POLL,
+    DEFAULT_RING_POLL_INTERVAL,
     CONF_AUDIO_PORT,
     CONF_AUTO_ANSWER,
     CONF_DEVICE_ACCOUNT,
@@ -98,6 +102,8 @@ class DX482OptionsFlow(OptionsFlow):
                 vol.Required(CONF_MON_CODE, default=cur.get(CONF_MON_CODE, DEFAULT_MON_CODE)): str,
                 vol.Required(CONF_IDLE_TIMEOUT, default=cur.get(CONF_IDLE_TIMEOUT, DEFAULT_IDLE_TIMEOUT)): vol.All(vol.Coerce(int), vol.Range(min=5, max=600)),
                 vol.Required(CONF_AUTO_ANSWER, default=cur.get(CONF_AUTO_ANSWER, DEFAULT_AUTO_ANSWER)): bool,
+                vol.Required(CONF_RING_POLL, default=cur.get(CONF_RING_POLL, DEFAULT_RING_POLL)): bool,
+                vol.Required(CONF_RING_POLL_INTERVAL, default=cur.get(CONF_RING_POLL_INTERVAL, DEFAULT_RING_POLL_INTERVAL)): vol.All(vol.Coerce(int), vol.Range(min=2, max=60)),
                 vol.Required(CONF_RELAY_COUNT, default=cur.get(CONF_RELAY_COUNT, DEFAULT_RELAY_COUNT)): vol.In([1, 2]),
                 vol.Required(CONF_SIP_PORT, default=cur.get(CONF_SIP_PORT, DEFAULT_SIP_PORT)): cv.port,
                 vol.Required(CONF_PROXY_PORT, default=cur.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)): cv.port,

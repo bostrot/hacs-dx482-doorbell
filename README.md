@@ -108,6 +108,19 @@ above: **Point doorbell at Home Assistant** rewrites `sipcfg.cfg` to this host (
 backup) and **Restore vendor cloud** puts the original back. Press **Reboot doorbell**
 after either.
 
+### Ring detection without divert (call-log polling)
+
+The doorbell only sends a SIP call to Home Assistant when its **divert** mode is on,
+and that mode is buried in the installer menu. If you can't or don't want to enable it,
+turn on **Ring detection via call log** in the integration's options. Home Assistant
+then watches the doorbell's own call-record table over FTP and fires the ring event
+(and your notification) whenever the door station is pressed. It needs no device-menu
+change and no cloud. Trade-off: a few seconds of latency (the poll interval, default 3 s)
+and light extra load on the doorbell. Live video and unlock still work on demand.
+
+If you later enable divert on the doorbell, the instant SIP path takes over and you can
+switch this off.
+
 ### Auto-answer on ring
 
 Off by default. When enabled (Configure → options), a ring is answered immediately so

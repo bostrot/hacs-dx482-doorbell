@@ -32,7 +32,9 @@
           "sip_port": "SIP port (doorbell [server] port)",
           "proxy_port": "Media proxy port",
           "audio_port": "Audio RTP port",
-          "video_port": "Video RTP port"
+          "video_port": "Video RTP port",
+          "ring_poll": "Ring detection via call log (works without divert)",
+          "ring_poll_interval": "Ring poll interval (seconds)"
         }
       }
     }

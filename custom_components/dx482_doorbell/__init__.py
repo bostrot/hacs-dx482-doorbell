@@ -30,6 +30,8 @@ from .const import (
     CONF_MON_CODE,
     CONF_PHONE_ACCOUNT,
     CONF_PROXY_PORT,
+    CONF_RING_POLL,
+    CONF_RING_POLL_INTERVAL,
     CONF_SIP_PORT,
     CONF_VIDEO_PORT,
     DEFAULT_AUDIO_PORT,
@@ -37,6 +39,8 @@ from .const import (
     DEFAULT_IDLE_TIMEOUT,
     DEFAULT_MON_CODE,
     DEFAULT_PROXY_PORT,
+    DEFAULT_RING_POLL,
+    DEFAULT_RING_POLL_INTERVAL,
     DEFAULT_SIP_PORT,
     DEFAULT_VIDEO_PORT,
     DEVICE_SIP_PORT,
@@ -46,6 +50,7 @@ from .const import (
     SIGNAL_DOORBELL_EVENT,
     SIGNAL_STATE,
 )
+from .call_poller import CallRecordPoller
 from .device_config import DeviceConfig
 from .session import EVENT_RING, DX482Session
 
@@ -70,6 +75,7 @@ class DX482Data:
     state: dict[str, Any] = field(default_factory=dict)
     device_config: DeviceConfig | None = None
     notify: Any = None  # callback: push a state refresh to all entities
+    call_poller: Any = None
 
 
 type DX482ConfigEntry = ConfigEntry[DX482Data]
@@ -80,18 +86,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> boo
     state: dict[str, Any] = {"call": "idle", "proxy": "disconnected", "video": "off", "registered": False}
 
     @callback
-    def _on_event(event: str, data: Any) -> None:
+    def _fire_ring() -> None:
+        state["last_ring"] = time.time()
+        async_dispatcher_send(hass, f"{SIGNAL_DOORBELL_EVENT}_{entry.entry_id}", "ring")
+        async_dispatcher_send(hass, f"{SIGNAL_STATE}_{entry.entry_id}")
+
+    @callback
+    def _on_event(event: str, payload: Any) -> None:
         if event == EVENT_RING:
-            state["last_ring"] = time.time()
-            async_dispatcher_send(hass, f"{SIGNAL_DOORBELL_EVENT}_{entry.entry_id}", "ring")
-        elif event == "registered":
-            state["registered"] = bool(data)
+            _fire_ring()
+            return
+        if event == "registered":
+            state["registered"] = bool(payload)
             # The doorbell just (re)booted and registered: re-read its settings.
-            data = getattr(entry, "runtime_data", None)
-            if data is not None and data.device_config is not None:
+            rt = getattr(entry, "runtime_data", None)
+            if rt is not None and rt.device_config is not None:
                 hass.async_create_task(_refresh_device_config(entry))
         else:
-            state[event] = data
+            state[event] = payload
         async_dispatcher_send(hass, f"{SIGNAL_STATE}_{entry.entry_id}")
 
     session = DX482Session(
@@ -134,6 +146,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> boo
         name=entry.title,
     )
 
+    if cfg.get(CONF_RING_POLL, DEFAULT_RING_POLL):
+        poller = CallRecordPoller(
+            hass, device_config,
+            cfg.get(CONF_RING_POLL_INTERVAL, DEFAULT_RING_POLL_INTERVAL),
+            _fire_ring,
+        )
+        poller.start()
+        entry.runtime_data.call_poller = poller
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
@@ -151,6 +172,8 @@ async def _refresh_device_config(entry: DX482ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DX482ConfigEntry) -> bool:
+    if entry.runtime_data.call_poller is not None:
+        await entry.runtime_data.call_poller.stop()
     ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     await entry.runtime_data.session.stop()
     return ok
