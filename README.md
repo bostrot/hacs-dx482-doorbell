@@ -141,6 +141,10 @@ phone picked up.
 The integration ships a small set of chime sounds and, on startup, copies them into
 `<config>/www/dx482/` so Home Assistant serves them at `/local/dx482/<name>.mp3`
 (`ding_dong`, `doorbell`, `bright`, `chord`, `marimba`, `glockenspiel`, `bells`).
+Each chime is one to three seconds long, which is easy to miss. Every chime also ships
+as a `<name>_ring.mp3` variant that repeats the chime with a short pause for just over
+30 seconds, so one `play_media` call rings the speakers for the whole time a visitor
+would keep pressing the button. Use `ding_dong_ring`, `marimba_ring`, and so on.
 Google Cast speakers only play audio from a URL they can reach, which on an isolated
 IoT network means Home Assistant's own IP, so play the chime by absolute URL:
 
@@ -149,7 +153,7 @@ IoT network means Home Assistant's own IP, so play the chime by absolute URL:
   target:
     entity_id: media_player.google_home
   data:
-    media_content_id: "http://<HA-IP>:8123/local/dx482/ding_dong.mp3"
+    media_content_id: "http://<HA-IP>:8123/local/dx482/ding_dong_ring.mp3"
     media_content_type: music
 ```
 
