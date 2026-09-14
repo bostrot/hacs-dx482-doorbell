@@ -1,0 +1,75 @@
+name: Device compatibility report
+description: Report whether the integration works with a 2easy / V-Tec / CDVI unit other than the DX482
+title: "[device] <model>: works / partially / fails"
+labels: ["device-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! Please mask account numbers, passwords and public IPs before pasting anything.
+  - type: input
+    id: model
+    attributes:
+      label: Model and brand
+      description: Exact model number and the brand printed on the box (2easy, V-Tec, CDVI, DVC, ...)
+      placeholder: CDVI CDV-47DX
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware version
+      description: Settings → About on the monitor
+      placeholder: V1.8.3
+    validations:
+      required: true
+  - type: dropdown
+    id: app
+    attributes:
+      label: Vendor app the unit shipped with
+      options:
+        - VDP Connect
+        - Tuya / Smart Life
+        - Other (say which in the notes)
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-flight checklist
+      description: From the README "Will my device work?" section
+      options:
+        - label: Root FTP login with empty password works
+        - label: /mnt/nand1-2/Settings/sipcfg.cfg exists
+        - label: "[server] points at 47.91.88.33:5068"
+        - label: "[account] and [divert] lines are present"
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What worked after pointing the unit at Home Assistant
+      options:
+        - label: Doorbell shows as connected (SIP REGISTER received)
+        - label: Ring event fires
+        - label: Live video
+        - label: Snapshot
+        - label: Unlock relay 1
+        - label: Unlock relay 2 / light
+        - label: Settings read/write (numbers, selects)
+        - label: Nothing worked
+  - type: textarea
+    id: sipcfg
+    attributes:
+      label: sipcfg.cfg (masked)
+      description: Replace account, divert and password values with xxx. Keep the keys and server lines.
+      render: ini
+  - type: textarea
+    id: logs
+    attributes:
+      label: Home Assistant log lines
+      description: Lines containing custom_components.dx482_doorbell, ideally with debug logging enabled
+      render: text
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else, e.g. different config path, different moncode, extra steps you needed

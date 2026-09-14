@@ -54,10 +54,36 @@ tested; reports (firmware version plus a sanitised `sipcfg.cfg`) are very welcom
 | 2easy-IX **IX471S**, **IX482** | Ethernet IP monitors supported by VDP Connect from firmware V1.8.1. The IX system runs its own LAN SIP server, so the server address, ports and config path may differ. |
 | Same units sold by Intelligent Home Online, DVC, 2easy.com.gr and other resellers | Different model numbers, identical hardware and firmware. |
 
-Quick check for an untested unit: root FTP login with an empty password works,
-`/mnt/nand1-2/Settings/sipcfg.cfg` exists with `[server]` pointing at `47.91.88.33:5068`,
-and the vendor app is VDP Connect. Jeatone, Anjielosmart and other Tuya-based
-intercoms are a different platform and are not candidates.
+### Will my device work? (checklist)
+
+Work through these before installing. If all boxes tick, the unit almost certainly
+speaks the same protocol as the DX482.
+
+- [ ] The vendor smartphone app is **VDP Connect** (not Tuya, Smart Life or a brand-specific app).
+- [ ] The unit is on the same LAN as Home Assistant and you know its IP.
+- [ ] `ftp <doorbell-ip>` logs in as user `root` with an **empty password**.
+- [ ] `/mnt/nand1-2/Settings/sipcfg.cfg` exists on the unit.
+- [ ] Inside it, `[server]` and `[serverIp]` point at `47.91.88.33:5068` (the vendor cloud).
+- [ ] It has an `[account]` line (`64…`) and a `[divert]` line (`6e…`).
+- [ ] Firmware is V1.8 or newer (Settings → About on the monitor).
+
+Jeatone, Anjielosmart and other Tuya-based intercoms fail the first box and are not
+candidates.
+
+### Testers wanted
+
+If you own any device from the table above, please try the integration and report
+back, whether it works or not. Open a
+[device report](https://github.com/bostrot/hacs-dx482-doorbell/issues/new?template=device-report.yml)
+with:
+
+1. Exact model and where you bought it (brand on the box).
+2. Firmware version from Settings → About.
+3. Your `sipcfg.cfg` with the account, divert and password values masked.
+4. Which parts worked: ring event, live video, snapshot, unlock, settings.
+5. Relevant lines from the Home Assistant log (`custom_components.dx482_doorbell`).
+
+Confirmed devices get promoted to the table at the top of this section.
 
 ## Installation
 
