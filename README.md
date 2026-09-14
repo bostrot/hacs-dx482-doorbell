@@ -32,6 +32,33 @@ Video/unlock sessions are started by Home Assistant calling the doorbell directl
 The wire protocol was reverse-engineered from the VDP Connect app and verified against
 a captured real cloud session; details are in `vdp.py`.
 
+## Supported devices
+
+| Status | Device |
+|---|---|
+| Confirmed | 2easy / V-Tec **DX482** Wi-Fi monitor |
+
+### Possibly working, not confirmed
+
+The integration does not depend on anything DX482-specific: it impersonates the
+**VDP Connect** cloud (SIP registrar on udp/5068, media proxy on tcp/8850) and reads
+`sipcfg.cfg` over root FTP. Any Video-Tech unit that uses the VDP Connect app and
+points at the same vendor server should behave the same. None of these have been
+tested; reports (firmware version plus a sanitised `sipcfg.cfg`) are very welcome.
+
+| Device | Notes |
+|---|---|
+| CDVI **CDV-47DX**, **CDV-470DX** | CDVI's UK rebrand of the 2easy Wi-Fi monitors. Manual names VDP Connect, a SIP config section and call divert. Most likely to work as-is. |
+| 2easy **DX471**, **DX470**, **DX47**, **DX439** | Previous-generation 2-wire Wi-Fi monitors. Firmware V1.8+ switched to VDP Connect with the "new media transmit protocol", which is what this integration speaks. Older firmware may still use plain SIP and will not work. |
+| 2easy **DH473** (VDP Connect variant) | 2025 hybrid 2-wire + IP monitor. Creates two SIP accounts (monitor and app), matching the `[account]` / `[divert]` setup fields. The Tuya variant will not work. |
+| 2easy-IX **IX471S**, **IX482** | Ethernet IP monitors supported by VDP Connect from firmware V1.8.1. The IX system runs its own LAN SIP server, so the server address, ports and config path may differ. |
+| Same units sold by Intelligent Home Online, DVC, 2easy.com.gr and other resellers | Different model numbers, identical hardware and firmware. |
+
+Quick check for an untested unit: root FTP login with an empty password works,
+`/mnt/nand1-2/Settings/sipcfg.cfg` exists with `[server]` pointing at `47.91.88.33:5068`,
+and the vendor app is VDP Connect. Jeatone, Anjielosmart and other Tuya-based
+intercoms are a different platform and are not candidates.
+
 ## Installation
 
 1. HACS → Integrations → ⋮ → **Custom repositories** → add this repo, category *Integration*.
