@@ -32,6 +32,10 @@ Video/unlock sessions are started by Home Assistant calling the doorbell directl
 The wire protocol was reverse-engineered from the VDP Connect app and verified against
 a captured real cloud session; details are in `vdp.py`.
 
+> **Full write-up:** how the device was taken apart, the cloud protocol decoded and
+> the integration built is documented step by step in
+> [Reverse Engineering the 2easy DX482 Video Doorbell for a Cloud-Free Home Assistant Integration](https://senpai.club/reverse-engineering-dx482-doorbell-home-assistant/).
+
 ## Supported devices
 
 | Status | Device |
